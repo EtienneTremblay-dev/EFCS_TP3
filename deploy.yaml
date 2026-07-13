@@ -1,0 +1,69 @@
+---
+- name: EFCS
+  hosts: web
+  become: yes
+
+  vars:
+    app_dir: /opt/web
+
+  tasks:
+
+    - name: Installer les dépendances
+      apt:
+        name:
+          - docker.io
+          - python3-pip
+          - python3-docker
+        state: present
+        update_cache: yes
+
+    - name: Activer Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Créer les répertoires
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/html"
+        - "{{ app_dir }}/nginx"
+
+    - name: Copier compose.yaml
+      copy:
+        src: files/compose.yaml
+        dest: "{{ app_dir }}/compose.yaml"
+      notify: Restart Compose
+
+    - name: Copier nginx.conf
+      copy:
+        src: files/nginx.conf
+        dest: "{{ app_dir }}/nginx/default.conf"
+      notify: Restart Compose
+
+    - name: Copier index.php
+      copy:
+        src: files/html/index.php
+        dest: "{{ app_dir }}/html/index.php"
+      notify: Restart Compose
+
+    - name: Lancer Docker Compose
+      command:
+        cmd: docker compose up -d
+        chdir: "{{ app_dir }}"
+
+  handlers:
+
+    - name: Restart Compose
+      command:
+        cmd: docker compose up -d
+        chdir: "{{ app_dir }}"
+
+    - name: Stop Compose
+      command:
+        cmd: docker compose down
+        chdir: "{{ app_dir }}"
